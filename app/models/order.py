@@ -7,7 +7,7 @@ class Order(db.Model):
     buyer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     seller_id = db.Column(db.Integer, db.ForeignKey('seller_profiles.id'), nullable=False)
 
-    total_amount = db.Column(db.Numeric(12, 2), nullable=False)
+    total_price = db.Column(db.Numeric(12, 2), nullable=False)
     status = db.Column(db.String(50))  # pending, paid, shipped, done
     payment_method = db.Column(db.String(50))  # cod, qris, transfer, wallet
     is_paid = db.Column(db.Boolean, default=False)

@@ -6,12 +6,14 @@ class SellerProfile(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True)
 
     shop_name = db.Column(db.String(100), nullable=False)
+    
     description = db.Column(db.Text)
     logo_url = db.Column(db.String(255))
     cover_image_url = db.Column(db.String(255))
     location_address = db.Column(db.String(255))
     location_lat = db.Column(db.Float)
     location_lng = db.Column(db.Float)
+    
     is_verified = db.Column(db.Boolean, default=False)  # by admin
     is_eco_friendly = db.Column(db.Boolean, default=False)
     
