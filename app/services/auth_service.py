@@ -3,6 +3,7 @@ from app.utils.extensions import db
 from app.models.user import User, UserRole
 from app.models.buyer import BuyerProfile
 from app.models.seller import SellerProfile
+from app.utils.validators import UserValidator  # validasi data user
 
 
 class AuthService:
@@ -11,37 +12,12 @@ class AuthService:
         Fungsi untuk registrasi buyer
         """
         try:
-            # Validasi data terlebih dahulu
-            validation_errors = []
-
-            # Cek apakah email sudah terdaftar di database lokal
-            existing_user = User.query.filter_by(email=data.get("email")).first()
-            if existing_user:
-                return {
-                    "success": False,
-                    "message": "Email sudah terdaftar di sistem",
-                }, 400
-
-            # Validasi field-field wajib
-            required_fields = ["email", "password", "username"]
-            for field in required_fields:
-                if not data.get(field):
-                    validation_errors.append(f"Field {field} wajib diisi")
-
-            # Validasi format email
-            if data.get("email") and "@" not in data.get("email"):
-                validation_errors.append("Format email tidak valid")
-
-            # Validasi password
-            if data.get("password") and len(data.get("password")) < 8:
-                validation_errors.append("Password minimal 8 karakter")
-
-            # Jika ada error validasi, kembalikan error
-            if validation_errors:
+            validation_result = UserValidator.validate_buyer_data(data)
+            if not validation_result["valid"]:
                 return {
                     "success": False,
                     "message": "Validasi gagal",
-                    "errors": validation_errors,
+                    "errors": validation_result["errors"],
                 }, 400
 
             # 1. Registrasi di Supabase
@@ -134,59 +110,15 @@ class AuthService:
         Fungsi untuk registrasi seller
         """
         try:
-            # Validasi data terlebih dahulu
-            validation_errors = []
-
-            # Cek apakah email sudah terdaftar di database lokal
-            existing_user = User.query.filter_by(email=data.get("email")).first()
-            if existing_user:
-                return {
-                    "success": False,
-                    "message": "Email sudah terdaftar di sistem",
-                }, 400
-
-            # Validasi field-field wajib
-            required_fields = [
-                "email",
-                "password",
-                "shop_name",
-                "location_address",
-                "phone_number",
-            ]
-            for field in required_fields:
-                if not data.get(field):
-                    validation_errors.append(f"Field {field} wajib diisi")
-
-            # Validasi format email
-            if data.get("email") and "@" not in data.get("email"):
-                validation_errors.append("Format email tidak valid")
-
-            # Validasi password
-            if data.get("password") and len(data.get("password")) < 8:
-                validation_errors.append("Password minimal 8 karakter")
-
-            # Validasi location_lat dan location_lng (jika ada)
-            if data.get("location_lat") is not None:
-                try:
-                    float(data.get("location_lat"))
-                except (ValueError, TypeError):
-                    validation_errors.append("Format location_lat tidak valid")
-
-            if data.get("location_lng") is not None:
-                try:
-                    float(data.get("location_lng"))
-                except (ValueError, TypeError):
-                    validation_errors.append("Format location_lng tidak valid")
-
-            # Jika ada error validasi, kembalikan error
-            if validation_errors:
+            validation_result = UserValidator.validate_seller_data(data)
+            if not validation_result["valid"]:
                 return {
                     "success": False,
                     "message": "Validasi gagal",
-                    "errors": validation_errors,
+                    "errors": validation_result["errors"],
                 }, 400
 
-            # 1. Registrasi di Supabase (hanya dilakukan setelah validasi berhasil)
+            # 1. Registrasi di Supabase
             try:
                 auth_response = supabase_client.auth.sign_up(
                     {"email": data.get("email"), "password": data.get("password")}
@@ -307,27 +239,7 @@ class AuthService:
                 }, 404
 
             # Siapkan response data
-            response_data = {
-                "success": True,
-                "message": "Login berhasil",
-                "user_id": user.id,
-                "email": user.email,
-                "role": user.role.value if user.role else None,
-                "access_token": auth_response.session.access_token,
-                "refresh_token": auth_response.session.refresh_token,
-            }
-
-            # Tambahkan data profil jika ada
-            if user.role and user.role.value == "buyer" and user.buyer_profile:
-                response_data["profile"] = {
-                    "username": user.buyer_profile.username,
-                    "profile_id": str(user.buyer_profile.id),
-                }
-            elif user.role and user.role.value == "seller" and user.seller_profile:
-                response_data["profile"] = {
-                    "shop_name": user.seller_profile.shop_name,
-                    "profile_id": user.seller_profile.id,
-                }
+            response_data = UserValidator.prepare_login_response(user, auth_response)
 
             return response_data, 200
 
@@ -343,8 +255,10 @@ class AuthService:
             if isinstance(email, dict):
                 email = email.get("email")
 
+            if not email:
+                return {"success": False, "message": "Email harus diisi"}, 400
+
             # Kirim ulang email verifikasi melalui Supabase
-            # Ganti resend() dengan resend_signup_email()
             supabase_client.auth.resend({"email": email, "type": "signup"})
 
             return {

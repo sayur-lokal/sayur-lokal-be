@@ -59,17 +59,10 @@ def logout_route(current_user):
     """
     Endpoint untuk logout user
     """
-    try:
-        # Panggil service logout tanpa parameter
-        result = AuthService.logout_user()
+    # Panggil service logout tanpa parameter
+    result = AuthService.logout_user()
 
-        if result["success"]:
-            return jsonify(result), 200
-        else:
-            return jsonify(result), 400
-
-    except Exception as e:
-        return (
-            jsonify({"success": False, "message": f"Terjadi kesalahan: {str(e)}"}),
-            500,
-        )
+    if result["success"]:
+        return jsonify(result), 200
+    else:
+        return jsonify(result), 400
