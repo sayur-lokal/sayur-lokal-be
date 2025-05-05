@@ -1,3 +1,4 @@
+from app.utils import chrono
 from app.utils.extensions import db
 
 
@@ -9,6 +10,8 @@ class OrderItem(db.Model):
 
     quantity = db.Column(db.Integer, nullable=True)
     price = db.Column(db.Numeric(10, 2), nullable=True)
+
+    created_at = db.Column(db.DateTime, default=chrono.now)
 
     # relationships
     order = db.relationship("Order", back_populates="order_items")
