@@ -1,5 +1,5 @@
 [project]
-name = "sayur-lokal-be"
+name = "eco-ecommerce-be"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -19,7 +19,6 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "pydantic[email]>=2.11.3",
     "pydentic>=0.0.1.dev3",
-    "pyproject-toml>=0.1.0",
     "pytest>=8.3.5",
     "ruff>=0.11.7",
     "supabase>=2.15.0",
