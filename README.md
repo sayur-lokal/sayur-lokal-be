@@ -17,8 +17,6 @@ API untuk aplikasi Sayur-lokal, sebuah platform jual beli produk lokal yang rama
 - `POST /auth/logout` - Logout user (butuh token)
 - `POST /auth/resend-verification` - Kirim ulang email verifikasi
 
-\*\*
-
 ## User Profile
 
 - `GET /user/profile` - Lihat profil user (token)
@@ -61,34 +59,6 @@ API untuk aplikasi Sayur-lokal, sebuah platform jual beli produk lokal yang rama
 - `GET /orders/{order_id}` - Detail order
 - `PUT /orders/{order_id}/status` - Update status (seller only)
 - `PUT /orders/{order_id}/cancel` - Batalkan order (buyer only)
-
----
-
-## Ratings & Reviews
-
-- `POST /ratings` - Buat rating (buyer only)
-- `GET /ratings/product/{product_id}` - Lihat semua rating produk
-- `GET /ratings/buyer` - Lihat semua rating yang dibuat buyer
-
----
-
-## Wallet
-
-- `GET /wallet/balance` - Lihat saldo
-- `GET /wallet/transactions` - Riwayat transaksi
-- `POST /wallet/topup` - Top up saldo
-- `POST /wallet/withdraw` - Tarik saldo (seller only)
-
----
-
-## Admin
-
-- `GET /admin/users` - Lihat semua user
-- `PUT /admin/users/{user_id}/status` - Update status user
-- `GET /admin/sellers` - Lihat semua seller
-- `PUT /admin/sellers/{seller_id}/verify` - Verifikasi seller
-- `GET /admin/withdrawals` - Lihat semua permintaan tarik saldo
-- `PUT /admin/withdrawals/{withdrawal_id}` - Proses penarikan
 
 ---
 
