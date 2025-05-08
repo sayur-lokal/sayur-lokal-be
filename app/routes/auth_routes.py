@@ -48,7 +48,7 @@ def resend_verification_route():
     Endpoint untuk mengirim ulang email verifikasi
     """
     data = request.json
-    result, status_code = AuthService.resend_verification_email(data.get("email"))
+    result, status_code = AuthService.resend_verification(data.get("email"))
     return jsonify(result), status_code
 
 
@@ -66,3 +66,22 @@ def logout_route(current_user):
         return jsonify(result), 200
     else:
         return jsonify(result), 400
+
+
+@auth_bp.route("/refresh-token", methods=["POST"])
+@handle_errors
+def refresh_token_route():
+    """
+    Endpoint untuk memperbaharui token akses menggunakan refresh token
+    """
+    data = request.json
+    refresh_token = data.get("refresh_token")
+
+    if not refresh_token:
+        return jsonify({
+            "success": False,
+            "message": "Refresh token diperlukan"
+        }), 400
+
+    result, status_code = AuthService.refresh_access_token(refresh_token)
+    return jsonify(result), status_code
