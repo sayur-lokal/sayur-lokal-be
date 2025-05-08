@@ -38,8 +38,8 @@ class ProductService:
                 stock=product_data.stock,
                 category_id=product_data.category_id,
                 seller_id=product_data.seller_id,
-                image_url=product_data.image_url,
-                # is_active=True,
+                product_image_url=product_data.product_image_url,
+                discount=product_data.discount or 0,
             )
 
             # Menyimpan ke database
@@ -69,10 +69,11 @@ class ProductService:
         price_min: Optional[float] = None,
         price_max: Optional[float] = None,
         name: Optional[str] = None,
-        # is_active: bool = True,
-    ) -> List[ProductResponse]:
+        page: Optional[int] = 1,
+        per_page: Optional[int] = 10,
+    ) -> dict:
         """
-        Mendapatkan daftar produk dengan filter opsional.
+        Mendapatkan daftar produk dengan filter opsional dan pagination.
         """
         query = Product.query
 
@@ -83,10 +84,6 @@ class ProductService:
         # Filter berdasarkan seller
         if seller_id:
             query = query.filter(Product.seller_id == seller_id)
-
-        # Filter berdasarkan status aktif
-        # if is_active is not None:
-        #     query = query.filter(Product.is_active == is_active)
 
         # Filter berdasarkan harga minimum
         if price_min is not None:
@@ -100,8 +97,30 @@ class ProductService:
         if name is not None:
             query = query.filter(Product.name.ilike(f"%{name}%"))
 
-        products = query.all()
-        return [ProductResponse.model_validate(product) for product in products]
+
+        # Hitung total produk yang sesuai dengan filter
+        total_products = query.count()
+
+        # Terapkan pagination
+        paginated_products = query.paginate(page=page, per_page=per_page, error_out=False)
+
+        # Konversi hasil ke format response
+        product_list = [ProductResponse.model_validate(product) for product in paginated_products.items]
+
+        # Buat response dengan informasi pagination
+        return {
+            "products": product_list,
+            "pagination": {
+                "total_items": total_products,
+                "total_pages": paginated_products.pages,
+                "current_page": page,
+                "per_page": per_page,
+                "has_next": paginated_products.has_next,
+                "has_prev": paginated_products.has_prev,
+                "next_page": paginated_products.next_num,
+                "prev_page": paginated_products.prev_num
+            }
+        }
 
     @staticmethod
     def update_product(
@@ -129,13 +148,19 @@ class ProductService:
                 product.stock = product_data.stock
 
             if product_data.category_id is not None:
+                # Validasi category_id
+                category = Category.query.get(product_data.category_id)
+                if not category:
+                    raise Exception(
+                        f"Kategori dengan ID {product_data.category_id} tidak ditemukan"
+                    )
                 product.category_id = product_data.category_id
 
-            if product_data.image_url is not None:
-                product.image_url = product_data.image_url
+            if product_data.product_image_url is not None:
+                product.product_image_url = product_data.product_image_url
 
-            # if product_data.is_active is not None:
-            #     product.is_active = product_data.is_active
+            if product_data.discount is not None:
+                product.discount = product_data.discount
 
             # Memperbarui waktu update
             product.updated_at = datetime.datetime.utcnow()
@@ -149,17 +174,14 @@ class ProductService:
     @staticmethod
     def delete_product(product_id: int) -> bool:
         """
-        Menghapus produk berdasarkan ID (soft delete dengan mengubah is_active menjadi False).
+        Menghapus produk berdasarkan ID (hard delete).
         """
         try:
             product = Product.query.get(product_id)
             if not product:
                 return False
 
-            # Soft delete
-            # product.is_active = False
-            product.updated_at = datetime.datetime.utcnow()
-
+            db.session.delete(product)
             db.session.commit()
             return True
         except SQLAlchemyError as e:
@@ -188,3 +210,35 @@ class ProductService:
             return image_url
         except Exception as e:
             raise Exception(f"Gagal mengunggah gambar: {str(e)}")
+
+    @staticmethod
+    def get_product_with_details(product_id: int):
+        """
+        Mendapatkan produk dengan detail tambahan seperti nama seller dan kategori.
+        """
+        try:
+            product = Product.query.get(product_id)
+            if not product:
+                return None
+
+            # Ambil data seller dan kategori
+            seller = SellerProfile.query.get(product.seller_id)
+            category = Category.query.get(product.category_id)
+
+            # Buat response dengan data tambahan
+            product_data = ProductResponse.model_validate(product)
+
+            # Hitung harga setelah diskon
+            final_price = product.price
+            if product.discount > 0:
+                final_price = product.price - (product.price * product.discount / 100)
+
+            # Buat response detail
+            return {
+                **product_data.model_dump(),
+                "seller_name": seller.shop_name if seller else None,
+                "category_name": category.name if category else None,
+                "final_price": float(final_price)
+            }
+        except Exception as e:
+            raise Exception(f"Gagal mendapatkan detail produk: {str(e)}")

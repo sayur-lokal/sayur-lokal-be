@@ -1,29 +1,74 @@
+from app.utils.helpers import _handle_validation_error
 from app.utils.supabase_client import supabase_client
 from app.utils.extensions import db
 from app.models.user import User, UserRole
 from app.models.buyer import BuyerProfile
 from app.models.seller import SellerProfile
-from app.utils.validators import UserValidator  # validasi data user
+from app.schemas.profile_schema import BuyerProfileCreate, SellerProfileCreate
+from app.schemas.user_schema import UserCreate, UserResponse
+from pydantic import ValidationError, EmailStr
+from typing import Dict, Any, Tuple
 
 
 class AuthService:
-    def register_buyer(data):
+    @staticmethod
+    def register_buyer(data: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
         """
-        Fungsi untuk registrasi buyer
+        Fungsi untuk registrasi buyer dengan validasi schema
         """
         try:
-            validation_result = UserValidator.validate_buyer_data(data)
-            if not validation_result["valid"]:
+            # 1. Validasi struktur data dengan Pydantic
+            try:
+                # Validasi data user
+                user_data = UserCreate(
+                    email=data.get("email"),
+                    password=data.get("password"),
+                    full_name=data.get("full_name")
+                )
+
+                # Validasi data profil buyer
+                profile_data = BuyerProfileCreate(
+                    user_id=0,  # Akan diupdate setelah user dibuat
+                    username=data.get("username"),
+                    address=data.get("address"),
+                    phone_number=data.get("phone_number"),
+                    profile_picture_url=data.get("profile_picture_url"),
+                    location_lat=data.get("location_lat"),
+                    location_lng=data.get("location_lng")
+                )
+
+                # Konversi kembali ke dict untuk penggunaan selanjutnya
+                validated_data = {
+                    **user_data.model_dump(),
+                    **profile_data.model_dump(exclude={"user_id"})
+                }
+
+            except ValidationError as e:
+                return _handle_validation_error(e)
+
+            # 2. Validasi bisnis (cek duplikasi)
+            # Cek apakah email sudah terdaftar
+            existing_user = User.query.filter_by(email=validated_data.get("email")).first()
+            if existing_user:
                 return {
                     "success": False,
-                    "message": "Validasi gagal",
-                    "errors": validation_result["errors"],
+                    "message": "Email sudah terdaftar di sistem"
                 }, 400
 
-            # 1. Registrasi di Supabase
+            # Cek apakah username sudah digunakan
+            existing_username = BuyerProfile.query.filter_by(
+                username=validated_data.get("username")
+            ).first()
+            if existing_username:
+                return {
+                    "success": False,
+                    "message": "Username sudah digunakan, silakan pilih username lain"
+                }, 400
+
+            # 3. Registrasi di Supabase
             try:
                 auth_response = supabase_client.auth.sign_up(
-                    {"email": data.get("email"), "password": data.get("password")}
+                    {"email": validated_data.get("email"), "password": validated_data.get("password")}
                 )
 
                 if hasattr(auth_response, "error") and auth_response.error:
@@ -41,29 +86,30 @@ class AuthService:
                     "message": f"Error saat mendaftar di Supabase: {str(supabase_error)}",
                 }, 500
 
-            # 2. Buat user di database lokal
+            # 4. Buat user di database lokal
             try:
                 # Mulai transaksi
                 db.session.begin_nested()
 
                 new_user = User(
-                    email=data.get("email"),
+                    email=validated_data.get("email"),
                     supabase_uid=supabase_uid,
-                    full_name=data.get("full_name"),
+                    full_name=validated_data.get("full_name"),
                     role=UserRole.BUYER,
                 )
 
                 db.session.add(new_user)
                 db.session.flush()  # Flush untuk mendapatkan ID
 
-                # 3. Buat profil buyer
+                # 5. Buat profil buyer
                 buyer_profile = BuyerProfile(
                     user_id=new_user.id,
-                    username=data.get("username"),
-                    address=data.get("address"),
-                    phone_number=data.get("phone_number"),
-                    location_lat=data.get("location_lat"),
-                    location_lng=data.get("location_lng"),
+                    username=validated_data.get("username"),
+                    address=validated_data.get("address"),
+                    phone_number=validated_data.get("phone_number"),
+                    profile_picture_url=validated_data.get("profile_picture_url"),
+                    location_lat=validated_data.get("location_lat"),
+                    location_lng=validated_data.get("location_lng"),
                 )
 
                 db.session.add(buyer_profile)
@@ -105,23 +151,69 @@ class AuthService:
         except Exception as e:
             return {"success": False, "message": f"Terjadi kesalahan: {str(e)}"}, 500
 
-    def register_seller(data):
+    @staticmethod
+    def register_seller(data: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
         """
-        Fungsi untuk registrasi seller
+        Fungsi untuk registrasi seller dengan validasi schema
         """
         try:
-            validation_result = UserValidator.validate_seller_data(data)
-            if not validation_result["valid"]:
+            # 1. Validasi struktur data dengan Pydantic
+            try:
+                # Validasi data user
+                user_data = UserCreate(
+                    email=data.get("email"),
+                    password=data.get("password"),
+                    full_name=data.get("full_name")
+                )
+
+                # Validasi data profil seller
+                profile_data = SellerProfileCreate(
+                    user_id=0,  # Akan diupdate setelah user dibuat
+                    shop_name=data.get("shop_name"),
+                    description=data.get("description"),
+                    logo_url=data.get("logo_url"),
+                    cover_image_url=data.get("cover_image_url"),
+                    location_address=data.get("location_address"),
+                    location_lat=data.get("location_lat"),
+                    location_lng=data.get("location_lng"),
+                    bank_account=data.get("bank_account"),
+                    qris_account=data.get("qris_account"),
+                    is_supports_cod=data.get("is_supports_cod", True),
+                    phone_number=data.get("phone_number")
+                )
+
+                # Konversi kembali ke dict untuk penggunaan selanjutnya
+                validated_data = {
+                    **user_data.model_dump(),
+                    **profile_data.model_dump(exclude={"user_id"})
+                }
+
+            except ValidationError as e:
+                return _handle_validation_error(e)
+
+            # 2. Validasi bisnis (cek duplikasi)
+            # Cek apakah email sudah terdaftar
+            existing_user = User.query.filter_by(email=validated_data.get("email")).first()
+            if existing_user:
                 return {
                     "success": False,
-                    "message": "Validasi gagal",
-                    "errors": validation_result["errors"],
+                    "message": "Email sudah terdaftar di sistem"
                 }, 400
 
-            # 1. Registrasi di Supabase
+            # Cek apakah nama toko sudah digunakan
+            existing_shop = SellerProfile.query.filter_by(
+                shop_name=validated_data.get("shop_name")
+            ).first()
+            if existing_shop:
+                return {
+                    "success": False,
+                    "message": "Nama toko sudah digunakan, silakan pilih nama toko lain"
+                }, 400
+
+            # 3. Registrasi di Supabase
             try:
                 auth_response = supabase_client.auth.sign_up(
-                    {"email": data.get("email"), "password": data.get("password")}
+                    {"email": validated_data.get("email"), "password": validated_data.get("password")}
                 )
 
                 if hasattr(auth_response, "error") and auth_response.error:
@@ -139,35 +231,35 @@ class AuthService:
                     "message": f"Error saat mendaftar di Supabase: {str(supabase_error)}",
                 }, 500
 
-            # 2. Buat user di database lokal
+            # 4. Buat user di database lokal
             try:
                 # Mulai transaksi
                 db.session.begin_nested()
 
                 new_user = User(
-                    email=data.get("email"),
+                    email=validated_data.get("email"),
                     supabase_uid=supabase_uid,
-                    full_name=data.get("full_name"),
+                    full_name=validated_data.get("full_name"),
                     role=UserRole.SELLER,
                 )
 
                 db.session.add(new_user)
                 db.session.flush()  # Flush untuk mendapatkan ID
 
-                # 3. Buat profil seller
+                # 5. Buat profil seller
                 seller_profile = SellerProfile(
                     user_id=new_user.id,
-                    shop_name=data.get("shop_name"),
-                    description=data.get("description"),
-                    logo_url=data.get("logo_url"),
-                    cover_image_url=data.get("cover_image_url"),
-                    location_address=data.get("location_address"),
-                    location_lat=data.get("location_lat"),
-                    location_lng=data.get("location_lng"),
-                    bank_account=data.get("bank_account"),
-                    qris_account=data.get("qris_account"),
-                    is_supports_cod=data.get("is_supports_cod", True),
-                    phone_number=data.get("phone_number"),
+                    shop_name=validated_data.get("shop_name"),
+                    description=validated_data.get("description"),
+                    logo_url=validated_data.get("logo_url"),
+                    cover_image_url=validated_data.get("cover_image_url"),
+                    location_address=validated_data.get("location_address"),
+                    location_lat=validated_data.get("location_lat"),
+                    location_lng=validated_data.get("location_lng"),
+                    bank_account=validated_data.get("bank_account"),
+                    qris_account=validated_data.get("qris_account"),
+                    is_supports_cod=validated_data.get("is_supports_cod", True),
+                    phone_number=validated_data.get("phone_number"),
                 )
 
                 db.session.add(seller_profile)
@@ -191,7 +283,7 @@ class AuthService:
                 if "duplicate key" in str(e) or "unique constraint" in str(e):
                     return {
                         "success": False,
-                        "message": "Email sudah terdaftar di sistem",
+                        "message": "Email atau nama toko sudah terdaftar di sistem",
                     }, 400
 
                 return {
@@ -209,83 +301,224 @@ class AuthService:
         except Exception as e:
             return {"success": False, "message": f"Terjadi kesalahan: {str(e)}"}, 500
 
-    def login_user(email, password):
+    @staticmethod
+    def login_user(email: str, password: str) -> Tuple[Dict[str, Any], int]:
         """
         Fungsi untuk login user
         """
-        if not email or not password:
-            return {"success": False, "message": "Email dan password harus diisi"}, 400
-
         try:
+            # Validasi input dasar
+            if not email:
+                return {
+                    "success": False,
+                    "message": "Email harus diisi"
+                }, 400
+
+            if not password:
+                return {
+                    "success": False,
+                    "message": "Password harus diisi"
+                }, 400
+
             # Login dengan Supabase
-            auth_response = supabase_client.auth.sign_in_with_password(
-                {"email": email, "password": password}
-            )
+            try:
+                auth_response = supabase_client.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password
+                })
 
-            # Cek apakah login berhasil
-            if hasattr(auth_response, "error") and auth_response.error:
+                if hasattr(auth_response, "error") and auth_response.error:
+                    # Jika error karena email belum diverifikasi
+                    if "Email not confirmed" in auth_response.error.message:
+                        return {
+                            "success": False,
+                            "message": "Email belum diverifikasi, silakan cek email Anda",
+                            "email_verified": False
+                        }, 400
+
+                    # Error login lainnya
+                    return {
+                        "success": False,
+                        "message": "Email atau password salah"
+                    }, 401
+
+                # Ambil data user dari database lokal
+                user = User.query.filter_by(supabase_uid=auth_response.user.id).first()
+                if not user:
+                    return {
+                        "success": False,
+                        "message": "User tidak ditemukan di sistem"
+                    }, 404
+
+                # Siapkan response berdasarkan role
+                user_data = {
+                    "id": user.id,
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "role": user.role.value,
+                    "created_at": user.created_at.isoformat() if user.created_at else None,
+                }
+
+                # Tambahkan data profil sesuai role
+                if user.role == UserRole.BUYER and user.buyer_profile:
+                    user_data["buyer_profile"] = {
+                        "id": user.buyer_profile.id,
+                        "username": user.buyer_profile.username,
+                        "address": user.buyer_profile.address,
+                        "phone_number": user.buyer_profile.phone_number,
+                        "profile_picture_url": user.buyer_profile.profile_picture_url,
+                        "location_lat": user.buyer_profile.location_lat,
+                        "location_lng": user.buyer_profile.location_lng,
+                    }
+                elif user.role == UserRole.SELLER and user.seller_profile:
+                    user_data["seller_profile"] = {
+                        "id": user.seller_profile.id,
+                        "shop_name": user.seller_profile.shop_name,
+                        "description": user.seller_profile.description,
+                        "logo_url": user.seller_profile.logo_url,
+                        "cover_image_url": user.seller_profile.cover_image_url,
+                        "location_address": user.seller_profile.location_address,
+                        "location_lat": user.seller_profile.location_lat,
+                        "location_lng": user.seller_profile.location_lng,
+                        "bank_account": user.seller_profile.bank_account,
+                        "qris_account": user.seller_profile.qris_account,
+                        "is_supports_cod": user.seller_profile.is_supports_cod,
+                        "phone_number": user.seller_profile.phone_number,
+                    }
+
+                return {
+                    "success": True,
+                    "message": "Login berhasil",
+                    "user": user_data,
+                    "access_token": auth_response.session.access_token,
+                    "refresh_token": auth_response.session.refresh_token,
+                }, 200
+
+            except Exception as supabase_error:
                 return {
                     "success": False,
-                    "message": f"Login gagal: {auth_response.error.message}",
-                }, 401
-
-            # Ambil data user dari database lokal
-            user = User.query.filter_by(email=email).first()
-
-            if not user:
-                return {
-                    "success": False,
-                    "message": "User tidak ditemukan di sistem",
-                }, 404
-
-            # Siapkan response data
-            response_data = UserValidator.prepare_login_response(user, auth_response)
-
-            return response_data, 200
+                    "message": f"Error saat login: {str(supabase_error)}"
+                }, 500
 
         except Exception as e:
             return {"success": False, "message": f"Terjadi kesalahan: {str(e)}"}, 500
 
-    def resend_verification_email(email):
+    @staticmethod
+    def resend_verification(email: str) -> Tuple[Dict[str, Any], int]:
         """
         Fungsi untuk mengirim ulang email verifikasi
         """
         try:
-            # Pastikan email adalah string, bukan dictionary
-            if isinstance(email, dict):
-                email = email.get("email")
-
+            # Validasi input dasar
             if not email:
-                return {"success": False, "message": "Email harus diisi"}, 400
+                return {
+                    "success": False,
+                    "message": "Email harus diisi"
+                }, 400
 
-            # Kirim ulang email verifikasi melalui Supabase
-            supabase_client.auth.resend({"email": email, "type": "signup"})
+            # Cek apakah email terdaftar
+            user = User.query.filter_by(email=email).first()
+            if not user:
+                return {
+                    "success": False,
+                    "message": "Email tidak terdaftar di sistem"
+                }, 404
 
-            return {
-                "success": True,
-                "message": "Email verifikasi telah dikirim ulang. Silakan periksa kotak masuk Anda.",
-            }, 200
+            # Kirim ulang email verifikasi dengan Supabase
+            try:
+                supabase_client.auth.resend_email(
+                    email=email,
+                    type="signup"
+                )
+
+                return {
+                    "success": True,
+                    "message": "Email verifikasi telah dikirim ulang, silakan cek email Anda"
+                }, 200
+
+            except Exception as supabase_error:
+                return {
+                    "success": False,
+                    "message": f"Error saat mengirim email verifikasi: {str(supabase_error)}"
+                }, 500
 
         except Exception as e:
             return {"success": False, "message": f"Terjadi kesalahan: {str(e)}"}, 500
 
-    def logout_user():
+    @staticmethod
+    def logout_user(token: str) -> Tuple[Dict[str, Any], int]:
         """
         Fungsi untuk logout user
         """
         try:
-            response = supabase_client.auth.sign_out()
-
-            # Periksa response
-            if hasattr(response, "error") and response.error:
+            # Validasi input dasar
+            if not token:
                 return {
                     "success": False,
-                    "message": f"Logout gagal: {response.error.message}",
-                }
+                    "message": "Token tidak valid"
+                }, 400
 
-            return {"success": True, "message": "Logout berhasil"}
+            # Logout dari Supabase
+            try:
+                supabase_client.auth.sign_out(token)
+
+                return {
+                    "success": True,
+                    "message": "Logout berhasil"
+                }, 200
+
+            except Exception as supabase_error:
+                return {
+                    "success": False,
+                    "message": f"Error saat logout: {str(supabase_error)}"
+                }, 500
+
         except Exception as e:
-            return {
-                "success": False,
-                "message": f"Terjadi kesalahan saat logout: {str(e)}",
-            }
+            return {"success": False, "message": f"Terjadi kesalahan: {str(e)}"}, 500
+
+
+    def refresh_access_token(refresh_token: str) -> Tuple[Dict[str, Any], int]:
+        """
+        Fungsi untuk memperbaharui access token menggunakan refresh token
+        """
+        try:
+            # Validasi input dasar
+            if not refresh_token:
+                return {
+                    "success": False,
+                    "message": "Refresh token harus diisi"
+                }, 400
+
+            # Refresh token dengan Supabase
+            try:
+                auth_response = supabase_client.auth.refresh_session(refresh_token)
+
+                if hasattr(auth_response, "error") and auth_response.error:
+                    return {
+                        "success": False,
+                        "message": "Refresh token tidak valid atau sudah kadaluarsa"
+                    }, 401
+
+                # Ambil data user dari database lokal
+                user = User.query.filter_by(supabase_uid=auth_response.user.id).first()
+                if not user:
+                    return {
+                        "success": False,
+                        "message": "User tidak ditemukan di sistem"
+                    }, 404
+
+                return {
+                    "success": True,
+                    "message": "Token berhasil diperbaharui",
+                    "access_token": auth_response.session.access_token,
+                    "refresh_token": auth_response.session.refresh_token,
+                }, 200
+
+            except Exception as supabase_error:
+                return {
+                    "success": False,
+                    "message": f"Error saat refresh token: {str(supabase_error)}"
+                }, 500
+
+        except Exception as e:
+            return {"success": False, "message": f"Terjadi kesalahan: {str(e)}"}, 500

@@ -1,8 +1,7 @@
 from app.utils.extensions import db
-# from uuid import UUID
-from sqlalchemy.dialects.postgresql import UUID
-from enum import Enum
 from app.utils import chrono
+from enum import Enum
+from sqlalchemy.dialects.postgresql import UUID
 
 class UserRole(Enum):
     BUYER = "buyer"
@@ -12,15 +11,15 @@ class UserRole(Enum):
 class User(db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
-    supabase_uid = db.Column(UUID(as_uuid=True), unique=True, nullable=False)  # dari Supabase
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    supabase_uid = db.Column(UUID(as_uuid=True), unique=True, nullable=True)  # dari Supabase
+    email = db.Column(db.String(120), unique=True, nullable=True)
     # password = db.Column(db.String(255), nullable=False)
-    full_name = db.Column(db.String(100))
+    full_name = db.Column(db.String(100), nullable=True)
     role = db.Column(db.Enum(UserRole), nullable=True)
-    is_suspended = db.Column(db.Boolean, default=False)
+    is_suspended = db.Column(db.Boolean, default=False, nullable=True)
 
-    created_at = db.Column(db.DateTime, default=chrono.now)
-    updated_at = db.Column(db.DateTime, default=chrono.now, onupdate=chrono.now)
+    created_at = db.Column(db.DateTime, default=chrono.now, nullable=True)
+    updated_at = db.Column(db.DateTime, default=chrono.now, onupdate=chrono.now, nullable=True)
 
     # Relationships
     buyer_profile = db.relationship("BuyerProfile", back_populates="user", uselist=False)
