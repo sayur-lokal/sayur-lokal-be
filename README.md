@@ -4,8 +4,9 @@ API untuk aplikasi Sayur-lokal, sebuah platform jual beli produk lokal yang rama
 
 ## Base URL
 
-- Production: `https://fsse-oct24-group-k-gfp-be.onrender.com`
+- Production: `https://sayur-lokal-be.onrender.com/`
 - Local Development: `http://localhost:5000`
+- API Documentation: `https://documenter.getpostman.com`
 
 ---
 
