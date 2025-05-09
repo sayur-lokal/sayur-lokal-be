@@ -6,6 +6,10 @@ from app.routes.auth_routes import auth_bp
 from app.routes.user_routes import user_bp
 from app.routes.product_routes import product_bp
 from app.routes.category_routes import category_bp
+from app.routes.order_routes import order_bp
+from app.routes.rating_routes import rating_bp
+
+# from app.routes.dashboard_routes import dashboard_bp
 
 
 def create_app(config_class=ProductionConfig):
@@ -21,5 +25,8 @@ def create_app(config_class=ProductionConfig):
     app.register_blueprint(user_bp)
     app.register_blueprint(product_bp)
     app.register_blueprint(category_bp)
+    app.register_blueprint(order_bp)
+    app.register_blueprint(rating_bp)
+    # app.register_blueprint(dashboard_bp)
 
     return app

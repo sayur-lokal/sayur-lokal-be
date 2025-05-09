@@ -17,8 +17,6 @@ API untuk aplikasi Sayur-lokal, sebuah platform jual beli produk lokal yang rama
 - `POST /auth/logout` - Logout user (butuh token)
 - `POST /auth/resend-verification` - Kirim ulang email verifikasi
 
----
-
 ## User Profile
 
 - `GET /user/profile` - Lihat profil user (token)
