@@ -78,10 +78,21 @@ def refresh_token_route():
     refresh_token = data.get("refresh_token")
 
     if not refresh_token:
-        return jsonify({
-            "success": False,
-            "message": "Refresh token diperlukan"
-        }), 400
+        return jsonify({"success": False, "message": "Refresh token diperlukan"}), 400
 
     result, status_code = AuthService.refresh_access_token(refresh_token)
+    return jsonify(result), status_code
+
+
+@auth_bp.route("/delete-account", methods=["DELETE"])
+@handle_errors
+@token_required
+def delete_account_route(current_user):
+    """
+    Endpoint untuk menghapus akun pengguna
+    """
+    data = request.json
+    password = data.get("password")
+
+    result, status_code = AuthService.delete_account(current_user, password)
     return jsonify(result), status_code
