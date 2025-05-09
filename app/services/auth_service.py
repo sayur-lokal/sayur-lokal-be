@@ -446,29 +446,25 @@ class AuthService:
             return {"success": False, "message": f"Terjadi kesalahan: {str(e)}"}, 500
 
     @staticmethod
-    def logout_user(token: str) -> Tuple[Dict[str, Any], int]:
+    def logout_user(token: str = None) -> Dict[str, Any]:
         """
         Fungsi untuk logout user
+
+        Args:
+            token: Token akses yang akan diinvalidasi (opsional)
+
+        Returns:
+            Dictionary berisi status dan pesan
         """
         try:
-            # Validasi input dasar
-            if not token:
-                return {"success": False, "message": "Token tidak valid"}, 400
+            # Lakukan logout dari Supabase tanpa token
+            # Ini akan menghapus sesi di sisi klien
+            supabase_client.auth.sign_out()
 
-            # Logout dari Supabase
-            try:
-                supabase_client.auth.sign_out(token)
-
-                return {"success": True, "message": "Logout berhasil"}, 200
-
-            except Exception as supabase_error:
-                return {
-                    "success": False,
-                    "message": f"Error saat logout: {str(supabase_error)}",
-                }, 500
+            return {"success": True, "message": "Logout berhasil"}
 
         except Exception as e:
-            return {"success": False, "message": f"Terjadi kesalahan: {str(e)}"}, 500
+            return {"success": False, "message": f"Error saat logout: {str(e)}"}
 
     def refresh_access_token(refresh_token: str) -> Tuple[Dict[str, Any], int]:
         """
